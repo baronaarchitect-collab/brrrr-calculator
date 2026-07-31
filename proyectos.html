@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mis Proyectos</title>
+<style>
+  :root{
+    --green:#1a7a4c;--green-dark:#14603c;--green-light:#e7f4ec;
+    --blue:#2c6fb0;--blue-dark:#22578a;--blue-light:#e8f1f9;
+    --ink:#1c2530;--muted:#6b7885;--line:#dfe4ea;--bg:#f4f6f9;--card:#fff;--red:#c0392b;
+    --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh}
+  header{position:relative;background:linear-gradient(135deg,#14603c,#22578a);color:#fff;padding:26px 20px;text-align:center}
+  header a.home{position:absolute;left:20px;top:22px;color:#fff;text-decoration:none;font-size:13px;opacity:.9;font-weight:600}
+  header h1{font-size:26px;font-weight:800;letter-spacing:-.4px}
+  header p{opacity:.9;font-size:14px;margin-top:4px}
+
+  .wrap{max-width:960px;margin:0 auto;padding:26px 16px 60px}
+  .newbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+  .newbar a{flex:1;min-width:200px;text-decoration:none;padding:14px 18px;border-radius:12px;
+    font-weight:700;font-size:15px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow);border:1px solid var(--line)}
+  .newbar a.b1{background:var(--green-light);color:var(--green-dark)}
+  .newbar a.b2{background:var(--blue-light);color:var(--blue-dark)}
+  .newbar a:hover{transform:translateY(-2px)}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+  .proj{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+    overflow:hidden;display:flex;flex-direction:column}
+  .proj .top{padding:16px 18px 12px}
+  .proj .badge{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;
+    padding:3px 9px;border-radius:20px;margin-bottom:8px}
+  .proj.brrrr .badge{background:var(--green-light);color:var(--green-dark)}
+  .proj.rental .badge{background:var(--blue-light);color:var(--blue-dark)}
+  .proj h3{font-size:17px;font-weight:800;letter-spacing:-.2px;word-break:break-word}
+  .proj .date{font-size:12px;color:var(--muted);margin-top:3px}
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-top:1px solid var(--line)}
+  .metric{background:#fff;padding:10px 14px}
+  .metric .v{font-size:16px;font-weight:800}
+  .metric .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  .actions{display:flex;border-top:1px solid var(--line)}
+  .actions a,.actions button{flex:1;border:none;background:#fff;padding:12px;font-size:13.5px;font-weight:700;
+    cursor:pointer;text-decoration:none;text-align:center;color:var(--ink)}
+  .actions a:hover{background:var(--bg)}
+  .actions button{color:var(--red);border-left:1px solid var(--line)}
+  .actions button:hover{background:#fdecea}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--muted)}
+  .empty .ico{font-size:48px;margin-bottom:14px}
+  .empty h2{font-size:20px;color:var(--ink);margin-bottom:8px}
+  .note{font-size:12px;color:var(--muted);text-align:center;margin-top:26px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="index.html">← Inicio</a>
+  <h1>Mis Proyectos</h1>
+  <p id="count">Análisis guardados</p>
+</header>
+
+<div class="wrap">
+  <div class="newbar">
+    <a class="b1" href="brrrr.html">🔄 Nuevo análisis BRRRR</a>
+    <a class="b2" href="rental.html">🏠 Nueva propiedad de renta</a>
+  </div>
+  <div id="list"></div>
+  <div class="note">Los proyectos se guardan localmente en este navegador. Si borras los datos del navegador o usas otro dispositivo, no aparecerán.</div>
+</div>
+
+<script>
+(function(){
+  const STORE='reiProjects';
+  const urlFor={brrrr:'brrrr.html', rental:'rental.html'};
+  const labelFor={brrrr:'BRRRR', rental:'Propiedad de renta'};
+  const load=()=>{try{return JSON.parse(localStorage.getItem(STORE))||[]}catch(e){return[]}};
+  const save=p=>localStorage.setItem(STORE,JSON.stringify(p));
+
+  function fmtDate(ts){
+    try{return new Date(ts).toLocaleDateString('es',{day:'numeric',month:'short',year:'numeric'});}
+    catch(e){return '';}
+  }
+  function del(id){
+    if(!confirm('¿Eliminar este proyecto?'))return;
+    save(load().filter(p=>p.id!==id));
+    render();
+  }
+  window.__del=del;
+
+  function render(){
+    const projects=load().sort((a,b)=>b.date-a.date);
+    const list=document.getElementById('list');
+    document.getElementById('count').textContent =
+      projects.length ? projects.length+(projects.length===1?' proyecto guardado':' proyectos guardados') : 'Análisis guardados';
+
+    if(!projects.length){
+      list.innerHTML='<div class="empty"><div class="ico">📭</div><h2>Aún no tienes proyectos</h2>'+
+        '<p>Crea un análisis y pulsa «Guardar proyecto» para verlo aquí.</p></div>';
+      return;
+    }
+    list.innerHTML='<div class="grid">'+projects.map(p=>{
+      const metrics=(p.summary||[]).map(m=>
+        '<div class="metric"><div class="v">'+m.value+'</div><div class="k">'+m.label+'</div></div>').join('');
+      return '<div class="proj '+p.type+'">'+
+        '<div class="top"><span class="badge">'+(labelFor[p.type]||p.type)+'</span>'+
+        '<h3>'+escapeHtml(p.name)+'</h3>'+
+        '<div class="date">Guardado el '+fmtDate(p.date)+'</div></div>'+
+        '<div class="metrics">'+metrics+'</div>'+
+        '<div class="actions">'+
+          '<a href="'+urlFor[p.type]+'?project='+encodeURIComponent(p.id)+'">Abrir</a>'+
+          '<button onclick="__del(\''+p.id+'\')">Eliminar</button>'+
+        '</div></div>';
+    }).join('')+'</div>';
+  }
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+  render();
+})();
+</script>
+</body>
+</html>

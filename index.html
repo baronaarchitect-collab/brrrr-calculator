@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadoras de Inversión Inmobiliaria</title>
+<style>
+  :root{
+    --green:#1a7a4c;--green-dark:#14603c;
+    --blue:#2c6fb0;--blue-dark:#22578a;
+    --ink:#1c2530;--muted:#6b7885;--line:#dfe4ea;--bg:#f4f6f9;--card:#fff;
+    --shadow:0 4px 14px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh;
+    display:flex;flex-direction:column}
+  .hero{background:linear-gradient(135deg,#14603c,#22578a);color:#fff;
+    padding:64px 20px 56px;text-align:center}
+  .hero h1{font-size:36px;font-weight:800;letter-spacing:-.6px;line-height:1.15}
+  .hero p{font-size:16px;opacity:.92;margin-top:12px;max-width:560px;margin-left:auto;margin-right:auto}
+  .grid{max-width:900px;margin:-32px auto 0;padding:0 20px 60px;
+    display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  .tool{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    box-shadow:var(--shadow);padding:30px 26px;text-decoration:none;color:inherit;
+    display:flex;flex-direction:column;transition:transform .18s,box-shadow .18s;position:relative;overflow:hidden}
+  .tool:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(0,0,0,.14)}
+  .tool .bar{position:absolute;top:0;left:0;right:0;height:5px}
+  .tool.brrrr .bar{background:linear-gradient(90deg,var(--green),var(--green-dark))}
+  .tool.rental .bar{background:linear-gradient(90deg,var(--blue),var(--blue-dark))}
+  .icon{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    font-size:26px;margin-bottom:16px}
+  .tool.brrrr .icon{background:#e7f4ec}
+  .tool.rental .icon{background:#e8f1f9}
+  .tool h2{font-size:21px;font-weight:800;letter-spacing:-.3px}
+  .tag{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+    padding:3px 9px;border-radius:20px;margin-top:8px;width:fit-content}
+  .tool.brrrr .tag{background:#e7f4ec;color:var(--green-dark)}
+  .tool.rental .tag{background:#e8f1f9;color:var(--blue-dark)}
+  .tool p{color:var(--muted);font-size:14px;margin-top:14px;line-height:1.55;flex:1}
+  ul{list-style:none;margin:16px 0 20px;padding:0}
+  ul li{font-size:13px;color:var(--ink);padding:4px 0 4px 22px;position:relative}
+  ul li::before{content:"✓";position:absolute;left:0;font-weight:800}
+  .tool.brrrr ul li::before{color:var(--green)}
+  .tool.rental ul li::before{color:var(--blue)}
+  .cta{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
+  .tool.brrrr .cta{color:var(--green-dark)}
+  .tool.rental .cta{color:var(--blue-dark)}
+  .foot{text-align:center;font-size:12px;color:var(--muted);padding:20px}
+</style>
+</head>
+<body>
+  <div class="hero">
+    <h1>Calculadoras de Inversión Inmobiliaria</h1>
+    <p>Analiza tus deals antes de comprar. Elige la estrategia y obtén flujo de caja, retorno y proyecciones al instante.</p>
+    <a href="proyectos.html" style="display:inline-block;margin-top:18px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;text-decoration:none;padding:10px 20px;border-radius:24px;font-weight:700;font-size:14px">📂 Mis proyectos guardados</a>
+  </div>
+
+  <div class="grid">
+    <a class="tool brrrr" href="brrrr.html">
+      <div class="bar"></div>
+      <div class="icon">🔄</div>
+      <h2>Calculadora BRRRR</h2>
+      <span class="tag">Comprar · Rehab · Rentar · Refinanciar</span>
+      <p>Para la estrategia BRRRR: compra por debajo del valor, rehabilita, renta y refinancia para recuperar tu capital y repetir.</p>
+      <ul>
+        <li>Financiamiento puente y refinanciamiento</li>
+        <li>Efectivo recuperado y dejado en el trato</li>
+        <li>Retorno cash-on-cash (incluso infinito)</li>
+      </ul>
+      <span class="cta">Abrir calculadora →</span>
+    </a>
+
+    <a class="tool rental" href="rental.html">
+      <div class="bar"></div>
+      <div class="icon">🏠</div>
+      <h2>Propiedad de Renta</h2>
+      <span class="tag">Buy &amp; Hold · Largo plazo</span>
+      <p>Para inversión a largo plazo: analiza el flujo de caja, la tasa de capitalización y cómo crece tu patrimonio con los años.</p>
+      <ul>
+        <li>Flujo de caja, cap rate y cash-on-cash</li>
+        <li>Proyección de valor y capital a 30 años</li>
+        <li>Crecimiento de ingresos, gastos y apreciación</li>
+      </ul>
+      <span class="cta">Abrir calculadora →</span>
+    </a>
+  </div>
+
+  <div class="foot">Estimaciones para análisis. No constituye asesoría financiera. Inspirado en las calculadoras de BiggerPockets.</div>
+</body>
+</html>
