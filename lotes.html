@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analizador de Lotes en Arriendo</title>
+<style>
+  :root{
+    --am:#c97a12;--am-dark:#9c5c07;--am-light:#fdf2e3;
+    --ink:#2a2119;--muted:#8a7c6d;--line:#e7ded2;--bg:#faf7f2;--card:#fff;
+    --red:#c0392b;--green:#1a7a4c;
+    --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.45;-webkit-font-smoothing:antialiased}
+  header{position:relative;background:linear-gradient(135deg,var(--am),var(--am-dark));color:#fff;padding:26px 20px;text-align:center}
+  header a.home{position:absolute;left:20px;top:22px;color:#fff;text-decoration:none;font-size:13px;opacity:.9;font-weight:600}
+  header h1{font-size:24px;font-weight:800;letter-spacing:-.4px}
+  header p{opacity:.9;font-size:13.5px;margin-top:4px}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 16px 60px;display:grid;grid-template-columns:1fr 380px;gap:22px;align-items:start}
+  @media(max-width:900px){.wrap{grid-template-columns:1fr}}
+
+  .toolbar{max-width:1180px;margin:16px auto 0;padding:0 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .toolbar input{flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;background:#fff;color:var(--ink)}
+  .toolbar input:focus{outline:none;border-color:var(--am);box-shadow:0 0 0 3px var(--am-light)}
+  .toolbar button{background:var(--am);color:#fff;border:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}
+  .toolbar button:hover{background:var(--am-dark)}
+  .toolbar .projlink{color:var(--am-dark);text-decoration:none;font-weight:600;font-size:14px;padding:10px;white-space:nowrap}
+  .savemsg{color:var(--green);font-size:13px;font-weight:700}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden}
+  .card h2{font-size:15px;font-weight:700;padding:14px 18px;background:var(--am-light);color:var(--am-dark);
+    display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+  .card h2 .num{background:var(--am);color:#fff;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+  .card .body{padding:14px 18px}
+  .row{display:grid;grid-template-columns:1fr 165px;gap:12px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .row:last-child{border-bottom:none}
+  .row label{font-size:14px}
+  .row label small{display:block;color:var(--muted);font-size:11.5px;font-weight:400}
+  .inp{position:relative}
+  .inp .pre,.inp .suf{position:absolute;top:0;height:100%;display:flex;align-items:center;color:var(--muted);font-size:12px;pointer-events:none}
+  .inp .pre{left:9px}.inp .suf{right:9px}
+  .inp input,.inp select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px;text-align:right;background:#fff;color:var(--ink)}
+  .inp.has-pre input{padding-left:20px}.inp.has-suf input{padding-right:34px}
+  .inp select{text-align:left}
+  .inp input:focus,.inp select:focus{outline:none;border-color:var(--am);box-shadow:0 0 0 3px var(--am-light)}
+  .full{grid-template-columns:1fr}
+  .full .inp select,.full .inp input{text-align:left}
+  .auto{background:var(--am-light);border-radius:8px;padding:8px 10px;font-size:12.5px;color:var(--am-dark);margin-top:4px}
+  .auto b{font-weight:700}
+  .badge-note{font-size:11px;background:#fff4e0;color:#9c5c07;border:1px solid #f0d9ad;border-radius:6px;padding:6px 8px;margin-top:6px}
+
+  .results{position:sticky;top:16px}
+  .res-card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+  .res-head{background:linear-gradient(135deg,var(--am),var(--am-dark));color:#fff;padding:16px;text-align:center}
+  .res-head .big{font-size:28px;font-weight:800;letter-spacing:-.5px}
+  .res-head .lbl{font-size:12px;opacity:.9;text-transform:uppercase;letter-spacing:.5px}
+  .kpis{display:grid;grid-template-columns:1fr 1fr}
+  .kpi{padding:13px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .kpi:nth-child(2n){border-right:none}
+  .kpi .v{font-size:18px;font-weight:800}
+  .kpi .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
+  .pos{color:var(--green)}.neg{color:var(--red)}
+  .breakdown{padding:6px 16px 14px}
+  .breakdown h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:14px 0 6px;font-weight:700}
+  .bd{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px dashed var(--line);gap:8px}
+  .bd:last-child{border-bottom:none}
+  .bd span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+  .bd.total{font-weight:700;border-top:2px solid var(--line);border-bottom:none;padding-top:7px;margin-top:2px}
+  .bd .neg-amt{color:var(--red)}
+  details{margin:0 0 18px}
+  details summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--am-dark);padding:12px 16px;background:var(--am-light);border:1px solid var(--line);border-radius:10px}
+  .normatable{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:10px}
+  .normatable th,.normatable td{border:1px solid var(--line);padding:4px 6px;text-align:center}
+  .normatable th{background:var(--am-light);color:var(--am-dark)}
+  .normatable td:first-child{text-align:left}
+  .foot{text-align:center;font-size:12px;color:var(--muted);padding:20px;max-width:900px;margin:0 auto}
+</style>
+</head>
+<body>
+<header>
+  <a class="home" href="index.html">← Inicio</a>
+  <h1>Analizador de Lotes en Arriendo</h1>
+  <p>Cali · Norma POT (Acuerdo 0373/2014) · Costo, arriendo, cashflow y rentabilidad</p>
+</header>
+
+<div class="toolbar">
+  <input id="projName" type="text" placeholder="Nombre del proyecto / dirección del lote…">
+  <button id="saveBtn">💾 Guardar proyecto</button>
+  <a class="projlink" href="proyectos.html">📂 Mis proyectos</a>
+  <span id="saveMsg" class="savemsg"></span>
+</div>
+
+<div class="wrap">
+  <div class="inputs">
+
+    <!-- 1. Lote -->
+    <div class="card">
+      <h2><span class="num">1</span> El lote</h2>
+      <div class="body">
+        <div class="row"><label>Área del lote</label>
+          <div class="inp has-suf"><input id="area" type="number" value="500"><span class="suf">m²</span></div></div>
+        <div class="row"><label>Zona</label>
+          <div class="inp"><select id="zona"></select></div></div>
+        <div class="row"><label>Arriendo mensual del lote<small>Canon que pagas por el terreno</small></label>
+          <div class="inp has-pre"><span class="pre">$</span><input id="landRent" type="number" value="4000000"></div></div>
+      </div>
+    </div>
+
+    <!-- 2. Uso y norma -->
+    <div class="card">
+      <h2><span class="num">2</span> Uso e índices (norma POT)</h2>
+      <div class="body">
+        <div class="row full"><label>Uso / tipo</label>
+          <div class="inp"><select id="uso"></select></div></div>
+        <div class="auto" id="rangoAuto">—</div>
+        <div class="row"><label>Índice de ocupación (IO)<small>% del lote en primer piso</small></label>
+          <div class="inp has-suf"><input id="io" type="number" value="0.7" step="0.01"><span class="suf">idx</span></div></div>
+        <div class="row"><label>Índice de construcción (IC)<small>m² construidos por m² de lote</small></label>
+          <div class="inp has-suf"><input id="ic" type="number" value="2.0" step="0.1"><span class="suf">idx</span></div></div>
+        <div class="badge-note" id="normaNote"></div>
+        <div class="auto" id="areaAuto">—</div>
+      </div>
+    </div>
+
+    <!-- 3. Costo de construcción -->
+    <div class="card">
+      <h2><span class="num">3</span> Costo de construcción (inversión)</h2>
+      <div class="body">
+        <div class="row"><label>Precio de construcción</label>
+          <div class="inp has-pre has-suf"><span class="pre">$</span><input id="pricePerM2" type="number" value="2830000"><span class="suf">/m²</span></div></div>
+        <div class="row"><label>Eficiencia rentable<small>% del área construida que renta</small></label>
+          <div class="inp has-suf"><input id="eff" type="number" value="85"><span class="suf">%</span></div></div>
+      </div>
+    </div>
+
+    <!-- 4. Arriendo (ingresos) -->
+    <div class="card">
+      <h2><span class="num">4</span> Arriendo de lo construido (ingresos)</h2>
+      <div class="body">
+        <div class="row"><label>Canon residencial</label>
+          <div class="inp has-pre has-suf"><span class="pre">$</span><input id="canonRes" type="number" value="30000"><span class="suf">/m²·mes</span></div></div>
+        <div class="row"><label>Canon comercial</label>
+          <div class="inp has-pre has-suf"><span class="pre">$</span><input id="canonCom" type="number" value="55000"><span class="suf">/m²·mes</span></div></div>
+        <div class="row"><label>Porción comercial<small>Ej: locales en primer piso</small></label>
+          <div class="inp has-suf"><input id="pctCom" type="number" value="20"><span class="suf">%</span></div></div>
+        <div class="badge-note">Los cánones/m² son valores de referencia editables. Verifícalos con el estudio de mercado (ver prompt de Gemini / scrapeo).</div>
+      </div>
+    </div>
+
+    <!-- 5. Gastos -->
+    <div class="card">
+      <h2><span class="num">5</span> Gastos operativos (mensuales)</h2>
+      <div class="body">
+        <div class="row"><label>Vacancia</label>
+          <div class="inp has-suf"><input id="exVac" type="number" value="8"><span class="suf">%</span></div></div>
+        <div class="row"><label>Reparación y mantenimiento</label>
+          <div class="inp has-suf"><input id="exRep" type="number" value="5"><span class="suf">%</span></div></div>
+        <div class="row"><label>Ahorro para gastos mayores (CapEx)</label>
+          <div class="inp has-suf"><input id="exCapex" type="number" value="5"><span class="suf">%</span></div></div>
+        <div class="row"><label>Administración</label>
+          <div class="inp has-suf"><input id="exAdmin" type="number" value="8"><span class="suf">%</span></div></div>
+        <div class="row"><label>Seguridad y aseo</label>
+          <div class="inp has-pre"><span class="pre">$</span><input id="exSeg" type="number" value="800000"></div></div>
+        <div class="row"><label>Predial + seguro</label>
+          <div class="inp has-pre"><span class="pre">$</span><input id="exPredial" type="number" value="0"></div></div>
+      </div>
+    </div>
+
+    <details>
+      <summary>📖 Ver tablas de la norma (POT Cali · Art. 238-239)</summary>
+      <div id="normaTables" style="background:#fff;border:1px solid var(--line);border-top:none;border-radius:0 0 10px 10px;padding:12px 14px"></div>
+    </details>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results">
+    <div class="res-card">
+      <div class="res-head">
+        <div class="big" id="rCF">$0</div>
+        <div class="lbl">Cashflow mensual</div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="rCoC">0%</div><div class="k">Cash-on-cash (anual)</div></div>
+        <div class="kpi"><div class="v" id="rPayback">0</div><div class="k">Años de recuperación</div></div>
+        <div class="kpi"><div class="v" id="rInv">$0</div><div class="k">Inversión (construcción)</div></div>
+        <div class="kpi"><div class="v" id="rArea">0 m²</div><div class="k">Área construida</div></div>
+      </div>
+
+      <div class="breakdown">
+        <h3>Edificabilidad</h3>
+        <div class="bd"><span>Área primer piso (lote × IO)</span><span id="bP1">0 m²</span></div>
+        <div class="bd"><span>Área construida (lote × IC)</span><span id="bAC">0 m²</span></div>
+        <div class="bd"><span>Área rentable</span><span id="bAR">0 m²</span></div>
+
+        <h3>Inversión</h3>
+        <div class="bd"><span>Costo de construcción</span><span id="bInv">$0</span></div>
+
+        <h3>Operación mensual</h3>
+        <div class="bd"><span>Ingreso por arriendo</span><span id="bIncome">$0</span></div>
+        <div class="bd"><span>− Vacancia</span><span id="bVac">$0</span></div>
+        <div class="bd"><span>− Arriendo del lote</span><span id="bLand">$0</span></div>
+        <div class="bd"><span>− Reparación</span><span id="bRep">$0</span></div>
+        <div class="bd"><span>− CapEx (gastos mayores)</span><span id="bCap">$0</span></div>
+        <div class="bd"><span>− Administración</span><span id="bAdm">$0</span></div>
+        <div class="bd"><span>− Seguridad y aseo</span><span id="bSeg">$0</span></div>
+        <div class="bd"><span>− Predial + seguro</span><span id="bPre">$0</span></div>
+        <div class="bd total"><span>Cashflow mensual</span><span id="bCF">$0</span></div>
+
+        <h3>Rentabilidad</h3>
+        <div class="bd"><span>Cashflow anual</span><span id="bCFy">$0</span></div>
+        <div class="bd"><span>Cap rate / Cash-on-cash</span><span id="bCoC">0%</span></div>
+        <div class="bd"><span>Recuperación de inversión</span><span id="bPay">0 años</span></div>
+      </div>
+      <div class="foot" id="rNote" style="padding:12px 16px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="foot">Estimaciones para prefactibilidad. Los índices de equipamientos provienen del Acuerdo 0373 de 2014 (POT Cali, Art. 238-239). Para usos residencial/comercial verifica los índices en el tratamiento urbanístico aplicable. No constituye asesoría financiera ni urbanística.</div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const num=id=>{const v=parseFloat($(id).value);return isNaN(v)?0:v;};
+
+  // ---- Norma POT Cali (Acuerdo 0373/2014, Art. 238-239) ----
+  // Para cada tipo: umbrales de área de predio [D<,C<,B<] (m²) -> rango; io/icBase/icTope = [A,B,C,D]
+  const NORMA = {
+    educacion:   {label:'Educación', th:[1600,8300,20000], io:[.40,.50,.60,.70], icB:[1.2,1.2,1.2,1.4], icT:[2.3,2.0,2.5,3.0]},
+    salud:       {label:'Salud', th:[800,4500,10000], io:[.75,.80,.85,.85], icB:[2.0,1.8,1.7,1.7], icT:[4.5,4.0,3.2,3.0]},
+    cultura:     {label:'Cultura', th:[350,1700,5000], io:[.60,.70,.70,.75], icB:[1.4,1.4,1.4,1.5], icT:[2.0,2.0,2.1,2.3]},
+    rechoriz:    {label:'Recreación (horizontal)', th:[5000,20000,60000], io:[.20,.40,.50,.60], icB:[0.2,0.4,0.6,0.6], icT:[0.4,0.6,0.7,0.8]},
+    recvert:     {label:'Recreación (vertical)', th:[1000,4700,10000], io:[.60,.70,.70,.80], icB:[2.0,1.7,1.4,1.6], icT:[2.6,2.8,2.6,2.4]},
+    bienestar:   {label:'Bienestar social', th:[350,1700,1700], io:[null,.60,.70,.80], icB:[null,1.8,1.8,1.6], icT:[null,2.0,2.1,1.7]},
+    culto:       {label:'Culto', th:[750,850,850], io:[null,.70,.80,.80], icB:[null,1.4,1.6,1.6], icT:[null,2.1,2.4,2.4]},
+    abastecim:   {label:'Abastecimiento de alimentos', th:[3500,3500,8000], io:[.50,.60,.70,null], icB:[1.0,1.2,1.4,null], icT:[0.7,0.8,0.9,null]},
+    seguridad:   {label:'Seguridad ciudadana', th:[1600,10000,37000], io:[.45,.50,.60,.70], icB:[1.6,1.5,1.2,1.4], icT:[4.0,3.0,2.2,2.3]},
+    justicia:    {label:'Admin. justicia y convivencia', th:[1000,1600,3000], io:[.50,.60,.60,.70], icB:[4.0,3.0,2.0,2.1], icT:[4.0,3.0,2.2,2.3]},
+    sedes:       {label:'Sedes administración pública', th:[1000,1600,3001], io:[.50,.60,.60,.70], icB:[4.0,3.0,2.0,2.1], icT:[4.0,3.0,2.2,2.3]},
+    cementerio:  {label:'Cementerios y funerarios', th:[10000,10000,100000], io:[.50,.60,.60,null], icB:[0.4,0.8,null,null], icT:[0.3,0.5,null,null]},
+    ferial:      {label:'Recintos feriales', th:[3700,3700,8000], io:[.50,.60,.60,null], icB:[1.0,1.2,1.2,null], icT:[2.0,2.0,1.5,null]},
+    deporte:     {label:'Deporte', th:[10000,10000,30000], io:[.40,.45,.50,null], icB:[0.8,0.9,1.0,null], icT:[2.0,2.0,2.1,null]},
+    florafauna:  {label:'Atención de flora y fauna', th:[5000,5000,15000], io:[.40,.50,null,null], icB:[0.8,1.0,null,null], icT:[0.8,1.0,null,null]}
+  };
+  // Usos rentables (no cubiertos por el PDF de equipamientos): IO/IC editables por defecto
+  const RENTABLE = {
+    residencial: {label:'Residencial (editable)', io:0.70, ic:2.0},
+    comercial:   {label:'Comercial (editable)', io:0.80, ic:2.0},
+    mixto:       {label:'Mixto vivienda + comercio (editable)', io:0.75, ic:2.5}
+  };
+
+  // Cánones de referencia por zona (COP/m²·mes) — placeholders editables, verificar con estudio de mercado
+  const ZONAS = {
+    'San Fernando':{res:32000,com:60000}, 'Centenario':{res:38000,com:70000},
+    'La Campiña':{res:26000,com:45000}, 'Versalles':{res:38000,com:72000},
+    'Av. 9na':{res:34000,com:65000}, 'Av. 44 Norte':{res:30000,com:58000},
+    '6ta Bis':{res:32000,com:60000}, 'Las Vegas':{res:30000,com:55000},
+    'Pampalinda':{res:30000,com:52000}, 'Cuarto de Legua':{res:28000,com:50000},
+    'Tequendama':{res:34000,com:62000}, 'Av. Roosevelt':{res:32000,com:60000},
+    'El Eucarístico':{res:28000,com:48000}, 'Otra / personalizada':{res:30000,com:55000}
+  };
+
+  // Poblar selects
+  const zonaSel=$('zona');
+  Object.keys(ZONAS).forEach(z=>{const o=document.createElement('option');o.value=z;o.textContent=z;zonaSel.appendChild(o);});
+  const usoSel=$('uso');
+  const gEq=document.createElement('optgroup');gEq.label='Equipamientos (IO/IC automáticos — norma POT)';
+  Object.entries(NORMA).forEach(([k,v])=>{const o=document.createElement('option');o.value='eq:'+k;o.textContent=v.label;gEq.appendChild(o);});
+  const gR=document.createElement('optgroup');gR.label='Uso rentable (IO/IC editables)';
+  Object.entries(RENTABLE).forEach(([k,v])=>{const o=document.createElement('option');o.value='rt:'+k;o.textContent=v.label;gR.appendChild(o);});
+  usoSel.appendChild(gR);usoSel.appendChild(gEq);
+  usoSel.value='rt:mixto';
+
+  const RN=['A','B','C','D'];
+  function rangoFor(th,area){ // th=[D<,C<,B<]; devuelve indice 0..3 (A..D)
+    if(area<=th[0]) return 3;      // D
+    if(area<=th[1]) return 2;      // C
+    if(area<=th[2]) return 1;      // B
+    return 0;                      // A
+  }
+
+  const cop=n=>{const neg=n<0;const s='$'+Math.abs(Math.round(n)).toLocaleString('es-CO');return neg?'-'+s:s;};
+  const m2=n=>Math.round(n).toLocaleString('es-CO')+' m²';
+  const pct=n=>{if(!isFinite(n))return '∞';return (Math.round(n*10)/10).toFixed(1)+'%';};
+
+  function applyUso(){
+    const v=usoSel.value;
+    if(v.startsWith('eq:')){
+      const t=NORMA[v.slice(3)];
+      const ri=rangoFor(t.th,num('area'));
+      const io=t.io[ri], icB=t.icB[ri], icT=t.icT[ri];
+      $('rangoAuto').innerHTML='Rango de predio: <b>'+RN[ri]+'</b> · Índice de ocupación norma: <b>'+(io!=null?io:'N.A.')+'</b> · IC base <b>'+(icB!=null?icB:'N.A.')+'</b> / tope <b>'+(icT!=null?icT:'N.A.')+'</b>';
+      if(io!=null) $('io').value=io;
+      if(icT!=null) $('ic').value=icT; else if(icB!=null) $('ic').value=icB;
+      $('normaNote').textContent='Valores tomados del Acuerdo 0373/2014 (Art. 239) para el uso "'+t.label+'" en rango '+RN[ri]+'. Puedes usar el IC base para un escenario conservador.';
+    } else {
+      const t=RENTABLE[v.slice(3)];
+      $('rangoAuto').innerHTML='Uso rentable — sin tabla de equipamientos. IO/IC sugeridos (edítalos según el tratamiento urbanístico del predio).';
+      $('io').value=t.io; $('ic').value=t.ic;
+      $('normaNote').textContent='Residencial/comercial no está en el PDF de equipamientos; estos índices son editables. Consulta el tratamiento urbanístico (consolidación, renovación, etc.) del predio en Planeación.';
+    }
+  }
+
+  function prefillZona(){
+    const z=ZONAS[zonaSel.value]||ZONAS['Otra / personalizada'];
+    $('canonRes').value=z.res; $('canonCom').value=z.com;
+  }
+
+  function calc(){
+    const area=num('area');
+    const io=num('io'), ic=num('ic');
+    const areaP1=area*io;
+    const areaC=area*ic;
+    const eff=num('eff')/100;
+    const areaR=areaC*eff;
+
+    const price=num('pricePerM2');
+    const inversion=areaC*price;
+
+    const pctCom=num('pctCom')/100;
+    const areaCom=areaR*pctCom;
+    const areaRes=areaR*(1-pctCom);
+    const ingreso=areaCom*num('canonCom')+areaRes*num('canonRes');
+
+    const vac=ingreso*num('exVac')/100;
+    const base=ingreso-vac;
+    const land=num('landRent');
+    const rep=ingreso*num('exRep')/100;
+    const cap=ingreso*num('exCapex')/100;
+    const adm=ingreso*num('exAdmin')/100;
+    const seg=num('exSeg');
+    const pre=num('exPredial');
+    const gastos=vac+land+rep+cap+adm+seg+pre;
+    const cf=ingreso-gastos;
+    const cfY=cf*12;
+    const coc=inversion>0?cfY/inversion*100:0;
+    const payback=cf>0?inversion/cfY:Infinity;
+
+    $('rCF').textContent=cop(cf);
+    $('rCoC').textContent=inversion>0?pct(coc):'—';
+    $('rCoC').className='v '+(cf>=0?'pos':'neg');
+    $('rPayback').textContent=isFinite(payback)?payback.toFixed(1):'∞';
+    $('rInv').textContent=cop(inversion);
+    $('rArea').textContent=m2(areaC);
+
+    $('bP1').textContent=m2(areaP1);
+    $('bAC').textContent=m2(areaC);
+    $('bAR').textContent=m2(areaR);
+    $('bInv').textContent=cop(inversion);
+    $('bIncome').textContent=cop(ingreso);
+    $('bVac').innerHTML='<span class="neg-amt">'+cop(-vac)+'</span>';
+    $('bLand').innerHTML='<span class="neg-amt">'+cop(-land)+'</span>';
+    $('bRep').innerHTML='<span class="neg-amt">'+cop(-rep)+'</span>';
+    $('bCap').innerHTML='<span class="neg-amt">'+cop(-cap)+'</span>';
+    $('bAdm').innerHTML='<span class="neg-amt">'+cop(-adm)+'</span>';
+    $('bSeg').innerHTML='<span class="neg-amt">'+cop(-seg)+'</span>';
+    $('bPre').innerHTML='<span class="neg-amt">'+cop(-pre)+'</span>';
+    $('bCF').textContent=cop(cf);
+    $('bCFy').textContent=cop(cfY);
+    $('bCoC').textContent=inversion>0?pct(coc):'—';
+    $('bPay').textContent=isFinite(payback)?payback.toFixed(1)+' años':'∞';
+
+    $('areaAuto').innerHTML='Primer piso <b>'+m2(areaP1)+'</b> · Área construida <b>'+m2(areaC)+'</b> · Rentable <b>'+m2(areaR)+'</b>';
+
+    let note='';
+    if(cf<=0) note='⚠ Cashflow negativo: el arriendo del lote + gastos superan el ingreso. Ajusta el canon del lote, el uso o los cánones de arriendo.';
+    else if(payback>25) note='Recuperación lenta ('+payback.toFixed(1)+' años). Revisa el costo del lote o el mix de usos.';
+    else note='A '+payback.toFixed(1)+' años de recuperación con '+pct(coc)+' de retorno anual sobre la inversión de construcción.';
+    $('rNote').textContent=note;
+  }
+
+  // Tablas de norma (referencia)
+  (function buildNormaTable(){
+    let h='<table class="normatable"><tr><th>Tipo (equipamiento)</th><th>IO A</th><th>IO B</th><th>IO C</th><th>IO D</th><th>IC tope A/B/C/D</th></tr>';
+    Object.values(NORMA).forEach(t=>{
+      const io=t.io.map(x=>x==null?'—':x).join(' / ');
+      const ict=t.icT.map(x=>x==null?'—':x).join('/');
+      h+='<tr><td>'+t.label+'</td><td>'+(t.io[0]??'—')+'</td><td>'+(t.io[1]??'—')+'</td><td>'+(t.io[2]??'—')+'</td><td>'+(t.io[3]??'—')+'</td><td>'+ict+'</td></tr>';
+    });
+    h+='</table><p style="font-size:11px;color:#8a7c6d;margin-top:8px">Rango A/B/C/D según área del predio (Art. 238). IO = índice de ocupación (fracción del lote en primer piso). IC tope = m² construibles por m² de lote. Fuente: Acuerdo 0373 de 2014.</p>';
+    $('normaTables').innerHTML=h;
+  })();
+
+  usoSel.addEventListener('change',()=>{applyUso();calc();});
+  zonaSel.addEventListener('change',()=>{prefillZona();calc();});
+  $('area').addEventListener('input',()=>{applyUso();calc();});
+  document.querySelectorAll('input').forEach(el=>el.addEventListener('input',calc));
+  applyUso();calc();
+
+  // ---------- Proyectos guardados ----------
+  const STORE='reiProjects', CALC_TYPE='lote';
+  const loadProjects=()=>{try{return JSON.parse(localStorage.getItem(STORE))||[]}catch(e){return[]}};
+  const saveProjects=p=>localStorage.setItem(STORE,JSON.stringify(p));
+  let editingId=null;
+  function collect(){
+    const inputs={};
+    document.querySelectorAll('input[type=number]').forEach(el=>{if(el.id)inputs[el.id]=el.value;});
+    return {inputs, sel:{uso:usoSel.value, zona:zonaSel.value}};
+  }
+  function restore(p){
+    const {inputs,sel}=p.data;
+    if(sel){ if(sel.uso)usoSel.value=sel.uso; if(sel.zona)zonaSel.value=sel.zona; }
+    Object.entries(inputs).forEach(([k,v])=>{if($(k))$(k).value=v;});
+    calc();
+  }
+  function saveProject(){
+    const name=($('projName').value||'').trim()||('Lote '+new Date().toLocaleDateString('es'));
+    const projects=loadProjects();
+    const summary=[
+      {label:'Cashflow/mes', value:$('rCF').textContent},
+      {label:'Cash-on-cash', value:$('rCoC').textContent},
+      {label:'Recuperación', value:$('rPayback').textContent+' años'},
+      {label:'Inversión', value:$('rInv').textContent}
+    ];
+    const rec={id:editingId||('p'+Date.now()), name, type:CALC_TYPE, date:Date.now(), data:collect(), summary};
+    const idx=projects.findIndex(x=>x.id===rec.id);
+    if(idx>=0)projects[idx]=rec; else projects.push(rec);
+    saveProjects(projects);
+    editingId=rec.id;
+    const m=$('saveMsg'); m.textContent='✓ Guardado en «Mis proyectos»'; setTimeout(()=>m.textContent='',2800);
+  }
+  $('saveBtn').addEventListener('click',saveProject);
+  const pid=new URLSearchParams(location.search).get('project');
+  if(pid){const p=loadProjects().find(x=>x.id===pid); if(p){editingId=p.id;$('projName').value=p.name;restore(p);}}
+})();
+</script>
+</body>
+</html>

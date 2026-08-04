@@ -8,6 +8,7 @@
   :root{
     --green:#1a7a4c;--green-dark:#14603c;
     --blue:#2c6fb0;--blue-dark:#22578a;
+    --am:#c97a12;--am-dark:#9c5c07;
     --ink:#1c2530;--muted:#6b7885;--line:#dfe4ea;--bg:#f4f6f9;--card:#fff;
     --shadow:0 4px 14px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.05);
   }
@@ -19,9 +20,9 @@
     padding:64px 20px 56px;text-align:center}
   .hero h1{font-size:36px;font-weight:800;letter-spacing:-.6px;line-height:1.15}
   .hero p{font-size:16px;opacity:.92;margin-top:12px;max-width:560px;margin-left:auto;margin-right:auto}
-  .grid{max-width:900px;margin:-32px auto 0;padding:0 20px 60px;
-    display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1}
-  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  .grid{max-width:1080px;margin:-32px auto 0;padding:0 20px 60px;
+    display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px;flex:1}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
   .tool{background:var(--card);border:1px solid var(--line);border-radius:16px;
     box-shadow:var(--shadow);padding:30px 26px;text-decoration:none;color:inherit;
     display:flex;flex-direction:column;transition:transform .18s,box-shadow .18s;position:relative;overflow:hidden}
@@ -29,6 +30,11 @@
   .tool .bar{position:absolute;top:0;left:0;right:0;height:5px}
   .tool.brrrr .bar{background:linear-gradient(90deg,var(--green),var(--green-dark))}
   .tool.rental .bar{background:linear-gradient(90deg,var(--blue),var(--blue-dark))}
+  .tool.lotes .bar{background:linear-gradient(90deg,var(--am),var(--am-dark))}
+  .tool.lotes .icon{background:#fdf2e3}
+  .tool.lotes .tag{background:#fdf2e3;color:var(--am-dark)}
+  .tool.lotes ul li::before{color:var(--am)}
+  .tool.lotes .cta{color:var(--am-dark)}
   .icon{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;
     font-size:26px;margin-bottom:16px}
   .tool.brrrr .icon{background:#e7f4ec}
@@ -82,6 +88,20 @@
         <li>Flujo de caja, cap rate y cash-on-cash</li>
         <li>Proyección de valor y capital a 30 años</li>
         <li>Crecimiento de ingresos, gastos y apreciación</li>
+      </ul>
+      <span class="cta">Abrir calculadora →</span>
+    </a>
+
+    <a class="tool lotes" href="lotes.html">
+      <div class="bar"></div>
+      <div class="icon">🏗️</div>
+      <h2>Lotes en Arriendo</h2>
+      <span class="tag">Cali · Norma POT · Desarrollo</span>
+      <p>Para desarrollar sobre un lote arrendado: define índices de la norma POT de Cali por uso, costo de construcción y rentabilidad.</p>
+      <ul>
+        <li>Índice de ocupación/construcción (Acuerdo 0373)</li>
+        <li>Costo de obra, cánones por zona y cashflow</li>
+        <li>Cash-on-cash y años de recuperación</li>
       </ul>
       <span class="cta">Abrir calculadora →</span>
     </a>
