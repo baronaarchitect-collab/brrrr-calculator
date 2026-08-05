@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Masa Normativa · WFS Cali</title>
+<style>
+  :root{--bg:#05080d;--bg2:#0d1218;--line:#1c2632;--ink:#e6ecf5;--dim:#8b97aa;
+    --am:#f4b942;--am2:#c88820;--viol:#a06bff;--cyan:#4fd0e0;--red:#ff6b6b;--green:#37d39b;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
+  .app{display:grid;grid-template-columns:340px 1fr;height:100vh}
+  @media(max-width:820px){.app{grid-template-columns:1fr;height:auto;overflow:auto}}
+  .panel{background:var(--bg2);border-right:1px solid var(--line);overflow-y:auto;padding:14px}
+  .brand{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .brand h1{font-size:15px;font-weight:800;letter-spacing:.3px}
+  .brand a{margin-left:auto;color:var(--dim);text-decoration:none;font-size:11px}
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--am);margin:16px 0 8px;font-weight:700}
+  .field{margin-bottom:8px}
+  .field label{font-size:11px;color:var(--dim);display:block;margin-bottom:3px}
+  input[type=text],select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:8px 9px;font-size:13px}
+  input:focus,select:focus{outline:none;border-color:var(--am)}
+  .btn{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:6px}
+  .btn:hover{border-color:var(--am)}
+  .btn.primary{background:linear-gradient(135deg,var(--am),var(--am2));color:#231a05;border:none}
+  .btn.viol{border-color:var(--viol)}
+  .predio{background:var(--bg);border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:7px;padding:10px;font-size:11px;line-height:1.6}
+  .predio .npn{color:var(--cyan);word-break:break-all}
+  .predio b{color:var(--ink)}
+  .predio .empty{color:var(--dim);font-style:italic}
+  .ctl{margin-bottom:10px}
+  .ctl label{font-size:12px;color:var(--ink);display:flex;justify-content:space-between}
+  .ctl label .v{color:var(--am);font-weight:700}
+  .ctl input[type=range]{width:100%;accent-color:var(--am);margin-top:5px}
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-top:8px}
+  .metric{background:var(--bg2);padding:9px 10px}
+  .metric .val{font-size:15px;font-weight:800}
+  .metric .lbl{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
+  .note{font-size:11px;color:var(--dim);line-height:1.5;margin-top:6px}
+  .note.warn{color:var(--red)} .note.ok{color:var(--green)}
+  .view{position:relative}
+  canvas{display:block;width:100%;height:100%}
+  @media(max-width:820px){.view{height:70vh}}
+  .hud{position:absolute;top:12px;left:12px;background:rgba(13,18,24,.8);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:11px;font-family:ui-monospace,monospace}
+  .hud .v{color:var(--am);font-weight:700}
+  .toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(13,18,24,.95);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-size:12px;opacity:0;transition:.3s;pointer-events:none}
+  .toast.show{opacity:1}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--line);border-top-color:var(--am);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="panel">
+    <div class="brand"><span style="font-size:18px">🏙️</span><h1>Masa Normativa</h1><a href="index.html">← Inicio</a></div>
+
+    <h2>1 · Buscar predio (WFS Cali)</h2>
+    <div class="field">
+      <label>Dirección, coordenadas (lat,lon) o NPN</label>
+      <input type="text" id="q" placeholder="Cra 39 #5-25  ·  3.4206,-76.5222">
+    </div>
+    <button class="btn primary" id="btn-find">🔍 Buscar en catastro</button>
+    <div class="predio" id="predio" style="margin-top:8px"><span class="empty">Sin predio. Busca una dirección o coordenada de Cali.</span></div>
+
+    <h2>2 · Uso e índices (norma POT)</h2>
+    <div class="field"><label>Uso</label><select id="uso"></select></div>
+    <div class="note" id="normaNote"></div>
+
+    <h2>3 · Parámetros de la masa</h2>
+    <div class="ctl"><label>Pisos <span class="v" id="v-floors">5</span></label><input type="range" id="s-floors" min="1" max="40" value="5"></div>
+    <div class="ctl"><label>Frente del edificio (m) <span class="v" id="v-front">12</span></label><input type="range" id="s-front" min="4" max="80" step="0.5" value="12"></div>
+    <div class="ctl"><label>Altura de piso (m) <span class="v" id="v-fh">3.0</span></label><input type="range" id="s-fh" min="2.4" max="6" step="0.1" value="3"></div>
+    <div class="ctl"><label>Retiro / aislamiento (m) <span class="v" id="v-off">3</span></label><input type="range" id="s-off" min="0" max="15" step="0.5" value="3"></div>
+    <button class="btn viol" id="btn-mass">▣ Desarrollar masa normativa</button>
+
+    <h2>4 · Resultados</h2>
+    <div class="metrics">
+      <div class="metric"><div class="val" id="m-lote">— m²</div><div class="lbl">Área lote</div></div>
+      <div class="metric"><div class="val" id="m-ocup">— m²</div><div class="lbl">Ocupación 1er piso (×IO)</div></div>
+      <div class="metric"><div class="val" id="m-fondo">— m</div><div class="lbl">Fondo (área/frente)</div></div>
+      <div class="metric"><div class="val" id="m-built">— m²</div><div class="lbl">Área construida</div></div>
+      <div class="metric"><div class="val" id="m-max">— m²</div><div class="lbl">Máx POT (ICB+ICA)</div></div>
+      <div class="metric"><div class="val" id="m-h">— m</div><div class="lbl">Altura</div></div>
+    </div>
+    <div class="note" id="checkNote"></div>
+    <button class="btn" id="btn-export" style="margin-top:10px">⇩ Exportar masa (JSON)</button>
+  </div>
+
+  <div class="view">
+    <canvas id="c"></canvas>
+    <div class="hud"><div>PREDIO <span class="v" id="hud-npn">—</span></div><div>ÁREA <span class="v" id="hud-area">—</span></div><div>IO/IC <span class="v" id="hud-idx">—</span></div></div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============ Norma POT Cali (Acuerdo 0373/2014) ============
+const NORMA = {
+  educacion:{label:'Educación',th:[1600,8300,20000],io:[.40,.50,.60,.70],icT:[2.3,2.0,2.5,3.0]},
+  salud:{label:'Salud',th:[800,4500,10000],io:[.75,.80,.85,.85],icT:[4.5,4.0,3.2,3.0]},
+  cultura:{label:'Cultura',th:[350,1700,5000],io:[.60,.70,.70,.75],icT:[2.0,2.0,2.1,2.3]},
+  recvert:{label:'Recreación (vertical)',th:[1000,4700,10000],io:[.60,.70,.70,.80],icT:[2.6,2.8,2.6,2.4]},
+  bienestar:{label:'Bienestar social',th:[350,1700,1700],io:[null,.60,.70,.80],icT:[null,2.0,2.1,1.7]},
+  seguridad:{label:'Seguridad ciudadana',th:[1600,10000,37000],io:[.45,.50,.60,.70],icT:[4.0,3.0,2.2,2.3]},
+  justicia:{label:'Admin. justicia',th:[1000,1600,3000],io:[.50,.60,.60,.70],icT:[4.0,3.0,2.2,2.3]},
+  sedes:{label:'Sedes admin. pública',th:[1000,1600,3001],io:[.50,.60,.60,.70],icT:[4.0,3.0,2.2,2.3]},
+  deporte:{label:'Deporte',th:[10000,10000,30000],io:[.40,.45,.50,null],icT:[2.0,2.0,2.1,null]}
+};
+const RENTABLE={residencial:{label:'Residencial',io:.70,ic:2.0},comercial:{label:'Comercial',io:.80,ic:2.0},mixto:{label:'Mixto vivienda+comercio',io:.75,ic:2.5}};
+const RN=['A','B','C','D'];
+function rango(th,a){ if(a<=th[0])return 3; if(a<=th[1])return 2; if(a<=th[2])return 1; return 0; }
+function indices(uso,area){
+  if(uso.startsWith('eq:')){const t=NORMA[uso.slice(3)];const r=rango(t.th,area);return{io:t.io[r],ic:t.icT[r],rango:RN[r],label:t.label,norma:true};}
+  const t=RENTABLE[uso.slice(3)]||RENTABLE.mixto; return{io:t.io,ic:t.ic,rango:null,label:t.label,norma:false};
+}
+// poblar select
+const usoSel=document.getElementById('uso');
+const g1=document.createElement('optgroup');g1.label='Uso rentable (IO/IC editable)';
+Object.entries(RENTABLE).forEach(([k,v])=>{const o=document.createElement('option');o.value='rt:'+k;o.textContent=v.label;g1.appendChild(o);});
+const g2=document.createElement('optgroup');g2.label='Equipamientos (norma POT)';
+Object.entries(NORMA).forEach(([k,v])=>{const o=document.createElement('option');o.value='eq:'+k;o.textContent=v.label;g2.appendChild(o);});
+usoSel.appendChild(g1);usoSel.appendChild(g2);usoSel.value='rt:mixto';
+
+// ============ WFS Cali (mismo motor que Life City) ============
+const WFS_BASE='https://ws-idesc.cali.gov.co/geoserver/ows';
+const WFS_LAYER='catastro:cat_bas_terrenos';
+const WFS_PROPS='npn,numepred,direpred,nom_barrio,comuna,uso_suelo,shape_area,the_geom';
+function wfsUrl(params){
+  const all={service:'WFS',version:'2.0.0',request:'GetFeature',typeNames:WFS_LAYER,
+    outputFormat:'application/json',srsName:'EPSG:4326',propertyName:WFS_PROPS,...params};
+  return WFS_BASE+'?'+Object.entries(all).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+}
+async function wfsLayer(layer,props,cql,count=5){
+  const url=WFS_BASE+'?'+Object.entries({service:'WFS',version:'2.0.0',request:'GetFeature',
+    typeNames:layer,outputFormat:'application/json',srsName:'EPSG:4326',propertyName:props,CQL_FILTER:cql,count})
+    .map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+  try{const r=await fetch(url);const j=await r.json();return j.features||[];}catch(e){return[];}
+}
+async function geocode(q){
+  const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q+', Cali, Colombia');
+  const r=await fetch(url,{headers:{'Accept':'application/json'}});const j=await r.json();
+  return (Array.isArray(j)&&j[0])?{lat:+j[0].lat,lon:+j[0].lon}:null;
+}
+function ringArea(pts){let a=0;for(let i=0,n=pts.length;i<n;i++){const p=pts[i],q=pts[(i+1)%n];a+=p.x*q.z-q.x*p.z;}return Math.abs(a/2);}
+function parsePisos(v){if(v==null)return null;const m=String(v).match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):null;} // "DOS (2) PISOS" -> 2
+function ringOf(geom){ // GeoJSON Polygon/MultiPolygon -> outer ring [ [lon,lat], ... ]
+  if(!geom)return null;
+  if(geom.type==='Polygon')return geom.coordinates[0];
+  if(geom.type==='MultiPolygon')return geom.coordinates[0][0];
+  return null;
+}
+function pointInRing(ring,lon,lat){let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];const inter=((yi>lat)!==(yj>lat))&&(lon<(xj-xi)*(lat-yi)/(yj-yi)+xi);if(inter)inside=!inside;}return inside;}
+
+// ============ THREE ============
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setClearColor(0x05080d,1);
+const scene=new THREE.Scene();scene.fog=new THREE.Fog(0x05080d,400,2200);
+const camera=new THREE.PerspectiveCamera(45,1,0.5,20000);camera.position.set(90,90,90);
+const controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.maxPolarAngle=Math.PI*0.495;controls.minDistance=8;controls.maxDistance=2000;
+scene.add(new THREE.AmbientLight(0x4a5878,0.8));
+const sun=new THREE.DirectionalLight(0xffd9a0,1.2);sun.position.set(120,220,90);scene.add(sun);
+scene.add(new THREE.GridHelper(1000,100,0x1a2230,0x11161e));
+const gLot=new THREE.Group();scene.add(gLot);
+const gMass=new THREE.Group();scene.add(gMass);
+function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;if(canvas.width!==w||canvas.height!==h){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}}
+(function loop(){resize();controls.update();renderer.render(scene,camera);requestAnimationFrame(loop);})();
+
+// proyección local (equirectangular alrededor del centroide del lote)
+let ref=null;
+function toLocal(lon,lat){const mLat=110540,mLon=111320*Math.cos(ref.lat*Math.PI/180);return{x:(lon-ref.lon)*mLon,z:-(lat-ref.lat)*mLat};}
+
+let LOT=null; // {ring(local pts), area, front:{a,b,dir,mid,inward,len}, props, icb, ica}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600);}
+
+function computeFront(pts){ // arista más larga = frente a la calle (heurística)
+  let best=-1,fi=0;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];const L=Math.hypot(b.x-a.x,b.z-a.z);if(L>best){best=L;fi=i;}}
+  const a=pts[fi],b=pts[(fi+1)%pts.length];const dir={x:(b.x-a.x)/best,z:(b.z-a.z)/best};
+  const mid={x:(a.x+b.x)/2,z:(a.z+b.z)/2};
+  const cx=pts.reduce((s,p)=>s+p.x,0)/pts.length,cz=pts.reduce((s,p)=>s+p.z,0)/pts.length;
+  let inward={x:cx-mid.x,z:cz-mid.z};const il=Math.hypot(inward.x,inward.z)||1;inward={x:inward.x/il,z:inward.z/il};
+  return{a,b,dir,mid,inward,len:best};
+}
+function maxDepth(pts,front){let d=0;for(const p of pts){const dd=(p.x-front.mid.x)*front.inward.x+(p.z-front.mid.z)*front.inward.z;if(dd>d)d=dd;}return d;}
+
+function drawLot(){
+  gLot.clear();
+  const pts=LOT.ring.map(p=>new THREE.Vector3(p.x,0.15,p.z));
+  gLot.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([...pts,pts[0]]),new THREE.LineBasicMaterial({color:0x6fb3ff})));
+  const shape=new THREE.Shape(LOT.ring.map(p=>new THREE.Vector2(p.x,p.z)));
+  const fill=new THREE.Mesh(new THREE.ShapeGeometry(shape),new THREE.MeshBasicMaterial({color:0x12324f,transparent:true,opacity:.5,side:THREE.DoubleSide}));
+  fill.rotation.x=-Math.PI/2;fill.position.y=0.05;gLot.add(fill);
+  // marca del frente
+  const f=LOT.front;gLot.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(f.a.x,0.3,f.a.z),new THREE.Vector3(f.b.x,0.3,f.b.z)]),new THREE.LineBasicMaterial({color:0xf4b942})));
+  const c=new THREE.Vector3(0,0,0);controls.target.copy(c);camera.position.set(Math.max(LOT.area**0.5,40),Math.max(LOT.area**0.5,40),Math.max(LOT.area**0.5,40));
+}
+
+function buildMass(){
+  if(!LOT)return toast('Primero busca un predio.');
+  gMass.clear();
+  const uso=usoSel.value,ix=indices(uso,LOT.area);
+  const floors=+document.getElementById('s-floors').value;
+  let front=+document.getElementById('s-front').value;
+  const fh=+document.getElementById('s-fh').value;
+  const off=+document.getElementById('s-off').value;
+
+  const ocupObjetivo=LOT.area*ix.io;          // área a ocupar en primer piso
+  // frente efectivo (con retiros laterales) y fondo
+  const frontEff=Math.max(front-2*off,2);
+  let fondo=ocupObjetivo/frontEff;
+  const dispDepth=Math.max(maxDepth(LOT.ring,LOT.front)-off,2);
+  let clamped=false;
+  if(fondo>dispDepth){fondo=dispDepth;clamped=true;}
+
+  const F=LOT.front, half=frontEff/2;
+  // base desplazada hacia adentro por retiro frontal
+  const b0={x:F.mid.x+F.inward.x*off,z:F.mid.z+F.inward.z*off};
+  const A={x:b0.x-F.dir.x*half,z:b0.z-F.dir.z*half};
+  const B={x:b0.x+F.dir.x*half,z:b0.z+F.dir.z*half};
+  const C={x:B.x+F.inward.x*fondo,z:B.z+F.inward.z*fondo};
+  const D={x:A.x+F.inward.x*fondo,z:A.z+F.inward.z*fondo};
+  const shape=new THREE.Shape([A,B,C,D].map(p=>new THREE.Vector2(p.x,p.z)));
+  const h=floors*fh;
+  const geo=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false});geo.rotateX(-Math.PI/2);
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xa06bff,transparent:true,opacity:.72,roughness:.5,metalness:.15}));
+  gMass.add(mesh);
+  gMass.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0xc9b3ff})));
+  // líneas de piso
+  for(let i=1;i<floors;i++){const y=i*fh;const r=[A,B,C,D,A].map(p=>new THREE.Vector3(p.x,y,p.z));gMass.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(r),new THREE.LineBasicMaterial({color:0xa06bff,transparent:true,opacity:.25})));}
+
+  const ocupReal=frontEff*fondo;
+  const built=ocupReal*floors;
+  // Máximo POT: si hay pisos normativos (icb/ica) el tope es por ALTURA; si no, por índice IC de la norma.
+  const maxPot = LOT.maxPisos ? ocupReal*LOT.maxPisos : LOT.area*ix.ic;
+  // métricas
+  document.getElementById('m-lote').textContent=Math.round(LOT.area).toLocaleString('es-CO')+' m²';
+  document.getElementById('m-ocup').textContent=Math.round(ocupReal).toLocaleString('es-CO')+' m²';
+  document.getElementById('m-fondo').textContent=fondo.toFixed(1)+' m';
+  document.getElementById('m-built').textContent=Math.round(built).toLocaleString('es-CO')+' m²';
+  document.getElementById('m-max').textContent=Math.round(maxPot).toLocaleString('es-CO')+' m²';
+  document.getElementById('m-h').textContent=h.toFixed(1)+' m';
+  let note='',cls='note';
+  if(LOT.maxPisos){
+    if(floors>LOT.maxPisos){note=`⚠ Excede la altura POT: máximo ${LOT.maxPisos} pisos (tienes ${floors}). Reduce pisos.`;cls='note warn';}
+    else{note=`✓ Dentro de la altura POT (máx ${LOT.maxPisos} pisos) · quedan ${LOT.maxPisos-floors} piso(s).`;cls='note ok';}
+  } else {
+    if(built>maxPot){note=`⚠ Excede el máximo POT en ${Math.round(built-maxPot).toLocaleString('es-CO')} m² (índice ${(maxPot/LOT.area).toFixed(2)}). Reduce pisos o frente.`;cls='note warn';}
+    else{note=`✓ Dentro del máximo POT · disponible ${Math.round(maxPot-built).toLocaleString('es-CO')} m². `;cls='note ok';}
+  }
+  if(clamped)note+=' El fondo se limitó al lote: con ese frente no cabe todo el IO — aumenta el frente.';
+  const cn=document.getElementById('checkNote');cn.textContent=note;cn.className=cls;
+  LOT._mass={uso:ix.label,io:ix.io,ic:ix.ic,floors,frente:front,fondo,fh,off,ocup:ocupReal,built,h,maxPisosPOT:LOT.maxPisos,maxPot};
+}
+
+function applyUso(){
+  if(!LOT){const ix=indices(usoSel.value,500);document.getElementById('normaNote').textContent=`IO ${ix.io} · IC ${ix.ic} · ${ix.label}`;return;}
+  const ix=indices(usoSel.value,LOT.area);
+  document.getElementById('normaNote').innerHTML=ix.norma
+    ?`Norma POT · ${ix.label} · rango <b style="color:#f4b942">${ix.rango}</b> → IO <b style="color:#f4b942">${ix.io}</b> · IC tope <b style="color:#f4b942">${ix.ic}</b>`
+    :`${ix.label} (editable) · IO ${ix.io} · IC ${ix.ic}`;
+  document.getElementById('hud-idx').textContent=`${ix.io} / ${ix.ic}`;
+}
+
+async function findPredio(){
+  const q=document.getElementById('q').value.trim();if(!q)return;
+  const pd=document.getElementById('predio');pd.innerHTML='<span class="spin"></span> Buscando en catastro…';
+  let lat,lon,cql;
+  const m=q.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+  if(/^\d{6,}$/.test(q)){ cql=`npn='${q}' OR numepred='${q}'`; }        // NPN
+  else if(m){ lat=+m[1];lon=+m[2]; }                                    // lat,lon
+  else { const g=await geocode(q); if(!g){pd.innerHTML='<span class="empty">No encontré esa dirección. Prueba con lat,lon.</span>';return;} lat=g.lat;lon=g.lon; }
+
+  let feats=[];
+  if(cql){ feats=await wfsLayerRaw({CQL_FILTER:cql,count:1}); }
+  else {
+    const d=0.0012;const bbox=`BBOX(the_geom,${lon-d},${lat-d},${lon+d},${lat+d},'EPSG:4326')`;
+    feats=await wfsLayerRaw({CQL_FILTER:bbox,count:25});
+    // elige el que contiene el punto
+    feats=feats.sort((f)=>{const r=ringOf(f.geometry);return pointInRing(r,lon,lat)?-1:1;});
+    const hit=feats.find(f=>{const r=ringOf(f.geometry);return r&&pointInRing(r,lon,lat);});
+    if(hit)feats=[hit];else if(feats.length)feats=[feats[0]];
+  }
+  if(!feats.length){pd.innerHTML='<span class="empty">Sin predios en esa ubicación (¿está en Cali?).</span>';return;}
+  const f=feats[0],p=f.properties,ring=ringOf(f.geometry);
+  if(!ring){pd.innerHTML='<span class="empty">El predio no trae geometría.</span>';return;}
+  const cx=ring.reduce((s,c)=>s+c[0],0)/ring.length, cy=ring.reduce((s,c)=>s+c[1],0)/ring.length;
+  ref={lat:cy,lon:cx};
+  const local=ring.map(c=>{const l=toLocal(c[0],c[1]);return{x:l.x,z:l.z};});
+  if(local.length>1 && local[0].x===local[local.length-1].x && local[0].z===local[local.length-1].z)local.pop();
+  const area=p.shape_area?+p.shape_area:ringArea(local);
+  LOT={ring:local,area,front:computeFront(local),props:p,icbTxt:null,icaTxt:null,maxPisos:null};
+  // POT edificabilidad en el punto (icb/ica vienen como texto de pisos, ej "DOS (2) PISOS")
+  const d=0.0006;const cqlP=`BBOX(the_geom,${cx-d},${cy-d},${cx+d},${cy+d},'EPSG:4326')`;
+  const pot=await wfsLayer('pot_2014:nur_edificabilidad_icb','icb,ica,the_geom',cqlP,3);
+  if(pot[0]){LOT.icbTxt=pot[0].properties.icb;LOT.icaTxt=pot[0].properties.ica;
+    const pb=parsePisos(LOT.icbTxt),pa=parsePisos(LOT.icaTxt);
+    if(pb!=null)LOT.maxPisos=pb+(pa||0);}
+  if(LOT.maxPisos){document.getElementById('s-floors').value=Math.min(LOT.maxPisos,40);document.getElementById('v-floors').textContent=document.getElementById('s-floors').value;}
+  // sugerir frente = min(arista frente, algo razonable)
+  document.getElementById('s-front').value=Math.min(Math.max(Math.round(LOT.front.len*0.9),6),80);
+  document.getElementById('v-front').textContent=document.getElementById('s-front').value;
+
+  pd.innerHTML=`<div class="npn">NPN ${p.npn||'—'}</div><b>${p.direpred||p.numepred||'Predio'}</b><br>`+
+    `${p.nom_barrio||''} · Comuna ${p.comuna||'—'}<br>`+
+    `Área: <b>${Math.round(area).toLocaleString('es-CO')} m²</b><br>`+
+    `Edificabilidad POT: <b>${LOT.icbTxt||'—'}</b>${LOT.icaTxt&&parsePisos(LOT.icaTxt)?(' + '+LOT.icaTxt):''}<br>`+
+    `${LOT.maxPisos?('Altura máx: <b style="color:#37d39b">'+LOT.maxPisos+' pisos</b> · '):''}frente lote ≈ ${LOT.front.len.toFixed(1)} m`;
+  document.getElementById('hud-npn').textContent=p.npn?String(p.npn).slice(-6):'—';
+  document.getElementById('hud-area').textContent=Math.round(area).toLocaleString('es-CO')+' m²';
+  drawLot();applyUso();buildMass();toast('Predio cargado ✓');
+}
+async function wfsLayerRaw(params){try{const r=await fetch(wfsUrl(params));const j=await r.json();return j.features||[];}catch(e){toast('Error WFS: '+e.message);return[];}}
+
+// sliders
+['s-floors','s-front','s-fh','s-off'].forEach(id=>{
+  const el=document.getElementById(id);const map={'s-floors':'v-floors','s-front':'v-front','s-fh':'v-fh','s-off':'v-off'};
+  el.addEventListener('input',()=>{document.getElementById(map[id]).textContent=el.value;if(LOT)buildMass();});
+});
+usoSel.addEventListener('change',()=>{applyUso();if(LOT)buildMass();});
+document.getElementById('btn-find').addEventListener('click',findPredio);
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')findPredio();});
+document.getElementById('btn-mass').addEventListener('click',buildMass);
+document.getElementById('btn-export').addEventListener('click',()=>{
+  if(!LOT||!LOT._mass)return toast('Genera una masa primero.');
+  const out={predio:LOT.props,area:LOT.area,icb:LOT.icb,ica:LOT.ica,masa:LOT._mass,ring_wgs84:LOT.ring};
+  const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='masa_'+(LOT.props.npn||'predio')+'.json';a.click();
+});
+applyUso();
+</script>
+</body>
+</html>

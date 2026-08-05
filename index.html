@@ -9,6 +9,7 @@
     --green:#1a7a4c;--green-dark:#14603c;
     --blue:#2c6fb0;--blue-dark:#22578a;
     --am:#c97a12;--am-dark:#9c5c07;
+    --vi:#7a4fd0;--vi-dark:#5a34a8;
     --ink:#1c2530;--muted:#6b7885;--line:#dfe4ea;--bg:#f4f6f9;--card:#fff;
     --shadow:0 4px 14px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.05);
   }
@@ -35,6 +36,11 @@
   .tool.lotes .tag{background:#fdf2e3;color:var(--am-dark)}
   .tool.lotes ul li::before{color:var(--am)}
   .tool.lotes .cta{color:var(--am-dark)}
+  .tool.masa .bar{background:linear-gradient(90deg,var(--vi),var(--vi-dark))}
+  .tool.masa .icon{background:#efe8fb}
+  .tool.masa .tag{background:#efe8fb;color:var(--vi-dark)}
+  .tool.masa ul li::before{color:var(--vi)}
+  .tool.masa .cta{color:var(--vi-dark)}
   .icon{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;
     font-size:26px;margin-bottom:16px}
   .tool.brrrr .icon{background:#e7f4ec}
@@ -104,6 +110,20 @@
         <li>Cash-on-cash y años de recuperación</li>
       </ul>
       <span class="cta">Abrir calculadora →</span>
+    </a>
+
+    <a class="tool masa" href="masa.html">
+      <div class="bar"></div>
+      <div class="icon">🏙️</div>
+      <h2>Masa Normativa 3D</h2>
+      <span class="tag">WFS Catastro Cali · Volumetría</span>
+      <p>Busca el predio en el catastro oficial de Cali (WFS), edita la masa en 3D y desarrolla la volumetría normativa por pisos y frente.</p>
+      <ul>
+        <li>Predio real desde ws-idesc.cali.gov.co</li>
+        <li>Pregunta pisos y frente del edificio</li>
+        <li>Valida altura contra la edificabilidad POT</li>
+      </ul>
+      <span class="cta">Abrir editor 3D →</span>
     </a>
   </div>
 
