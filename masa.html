@@ -151,7 +151,18 @@ async function geocode(q){
   return (Array.isArray(j)&&j[0])?{lat:+j[0].lat,lon:+j[0].lon}:null;
 }
 function ringArea(pts){let a=0;for(let i=0,n=pts.length;i<n;i++){const p=pts[i],q=pts[(i+1)%n];a+=p.x*q.z-q.x*p.z;}return Math.abs(a/2);}
-function parsePisos(v){if(v==null)return null;const m=String(v).match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):null;} // "DOS (2) PISOS" -> 2
+// La capa POT trae la edificabilidad de dos formas: texto de pisos ("DOS (2) PISOS")
+// o índice de construcción numérico con coma decimal ("1,7"). Se detecta el caso.
+function parseEdif(icb,ica){
+  const a=(icb==null?'':String(icb)).trim(), b=(ica==null?'':String(ica)).trim();
+  const floorsMode=/piso/i.test(a)||/piso/i.test(b);
+  const asInt=s=>{const m=String(s).match(/(\d+)/);return m?parseInt(m[1]):0;};
+  const asIdx=s=>{const m=String(s).replace(',','.').match(/(\d+(?:\.\d+)?)/);return m?parseFloat(m[1]):0;};
+  if(floorsMode) return {mode:'floors', maxPisos:asInt(a)+asInt(b), icbTxt:a, icaTxt:b};
+  const ic=asIdx(a)+asIdx(b);
+  if(ic>0) return {mode:'index', icTotal:ic, icbTxt:a, icaTxt:b};
+  return {mode:'none', icbTxt:a, icaTxt:b};
+}
 function ringOf(geom){ // GeoJSON Polygon/MultiPolygon -> outer ring [ [lon,lat], ... ]
   if(!geom)return null;
   if(geom.type==='Polygon')return geom.coordinates[0];
@@ -239,8 +250,12 @@ function buildMass(){
 
   const ocupReal=frontEff*fondo;
   const built=ocupReal*floors;
-  // Máximo POT: si hay pisos normativos (icb/ica) el tope es por ALTURA; si no, por índice IC de la norma.
-  const maxPot = LOT.maxPisos ? ocupReal*LOT.maxPisos : LOT.area*ix.ic;
+  // Máximo POT: modo pisos -> tope por altura; modo índice -> área × (ICB+ICA); si no hay POT -> IC de la norma.
+  const ed=LOT.edif;
+  const maxPisosPOT = ed && ed.mode==='floors' ? ed.maxPisos : null;
+  const maxPot = (ed && ed.mode==='index') ? LOT.area*ed.icTotal
+               : maxPisosPOT ? ocupReal*maxPisosPOT
+               : LOT.area*ix.ic;
   // métricas
   document.getElementById('m-lote').textContent=Math.round(LOT.area).toLocaleString('es-CO')+' m²';
   document.getElementById('m-ocup').textContent=Math.round(ocupReal).toLocaleString('es-CO')+' m²';
@@ -249,16 +264,16 @@ function buildMass(){
   document.getElementById('m-max').textContent=Math.round(maxPot).toLocaleString('es-CO')+' m²';
   document.getElementById('m-h').textContent=h.toFixed(1)+' m';
   let note='',cls='note';
-  if(LOT.maxPisos){
-    if(floors>LOT.maxPisos){note=`⚠ Excede la altura POT: máximo ${LOT.maxPisos} pisos (tienes ${floors}). Reduce pisos.`;cls='note warn';}
-    else{note=`✓ Dentro de la altura POT (máx ${LOT.maxPisos} pisos) · quedan ${LOT.maxPisos-floors} piso(s).`;cls='note ok';}
+  if(maxPisosPOT){
+    if(floors>maxPisosPOT){note=`⚠ Excede la altura POT: máximo ${maxPisosPOT} pisos (tienes ${floors}). Reduce pisos.`;cls='note warn';}
+    else{note=`✓ Dentro de la altura POT (máx ${maxPisosPOT} pisos) · quedan ${maxPisosPOT-floors} piso(s).`;cls='note ok';}
   } else {
     if(built>maxPot){note=`⚠ Excede el máximo POT en ${Math.round(built-maxPot).toLocaleString('es-CO')} m² (índice ${(maxPot/LOT.area).toFixed(2)}). Reduce pisos o frente.`;cls='note warn';}
-    else{note=`✓ Dentro del máximo POT · disponible ${Math.round(maxPot-built).toLocaleString('es-CO')} m². `;cls='note ok';}
+    else{note=`✓ Dentro del máximo POT · disponible ${Math.round(maxPot-built).toLocaleString('es-CO')} m² (índice ${(maxPot/LOT.area).toFixed(2)}). `;cls='note ok';}
   }
   if(clamped)note+=' El fondo se limitó al lote: con ese frente no cabe todo el IO — aumenta el frente.';
   const cn=document.getElementById('checkNote');cn.textContent=note;cn.className=cls;
-  LOT._mass={uso:ix.label,io:ix.io,ic:ix.ic,floors,frente:front,fondo,fh,off,ocup:ocupReal,built,h,maxPisosPOT:LOT.maxPisos,maxPot};
+  LOT._mass={uso:ix.label,io:ix.io,ic:ix.ic,floors,frente:front,fondo,fh,off,ocup:ocupReal,built,h,edif:LOT.edif,maxPot};
 }
 
 function applyUso(){
@@ -297,14 +312,19 @@ async function findPredio(){
   const local=ring.map(c=>{const l=toLocal(c[0],c[1]);return{x:l.x,z:l.z};});
   if(local.length>1 && local[0].x===local[local.length-1].x && local[0].z===local[local.length-1].z)local.pop();
   const area=p.shape_area?+p.shape_area:ringArea(local);
-  LOT={ring:local,area,front:computeFront(local),props:p,icbTxt:null,icaTxt:null,maxPisos:null};
-  // POT edificabilidad en el punto (icb/ica vienen como texto de pisos, ej "DOS (2) PISOS")
+  LOT={ring:local,area,front:computeFront(local),props:p,edif:null};
+  // POT edificabilidad en el punto
   const d=0.0006;const cqlP=`BBOX(the_geom,${cx-d},${cy-d},${cx+d},${cy+d},'EPSG:4326')`;
   const pot=await wfsLayer('pot_2014:nur_edificabilidad_icb','icb,ica,the_geom',cqlP,3);
-  if(pot[0]){LOT.icbTxt=pot[0].properties.icb;LOT.icaTxt=pot[0].properties.ica;
-    const pb=parsePisos(LOT.icbTxt),pa=parsePisos(LOT.icaTxt);
-    if(pb!=null)LOT.maxPisos=pb+(pa||0);}
-  if(LOT.maxPisos){document.getElementById('s-floors').value=Math.min(LOT.maxPisos,40);document.getElementById('v-floors').textContent=document.getElementById('s-floors').value;}
+  if(pot[0])LOT.edif=parseEdif(pot[0].properties.icb,pot[0].properties.ica);
+  // sugiere pisos según edificabilidad (pisos directos, o derivados del índice / IO del uso)
+  const ixNow=indices(usoSel.value,area);
+  let sugPisos=null;
+  if(LOT.edif){
+    if(LOT.edif.mode==='floors') sugPisos=LOT.edif.maxPisos;
+    else if(LOT.edif.mode==='index') sugPisos=Math.max(1,Math.round(LOT.edif.icTotal/(ixNow.io||0.7)));
+  }
+  if(sugPisos){document.getElementById('s-floors').value=Math.min(sugPisos,40);document.getElementById('v-floors').textContent=document.getElementById('s-floors').value;}
   // sugerir frente = min(arista frente, algo razonable)
   document.getElementById('s-front').value=Math.min(Math.max(Math.round(LOT.front.len*0.9),6),80);
   document.getElementById('v-front').textContent=document.getElementById('s-front').value;
@@ -312,8 +332,8 @@ async function findPredio(){
   pd.innerHTML=`<div class="npn">NPN ${p.npn||'—'}</div><b>${p.direpred||p.numepred||'Predio'}</b><br>`+
     `${p.nom_barrio||''} · Comuna ${p.comuna||'—'}<br>`+
     `Área: <b>${Math.round(area).toLocaleString('es-CO')} m²</b><br>`+
-    `Edificabilidad POT: <b>${LOT.icbTxt||'—'}</b>${LOT.icaTxt&&parsePisos(LOT.icaTxt)?(' + '+LOT.icaTxt):''}<br>`+
-    `${LOT.maxPisos?('Altura máx: <b style="color:#37d39b">'+LOT.maxPisos+' pisos</b> · '):''}frente lote ≈ ${LOT.front.len.toFixed(1)} m`;
+    `Edificabilidad POT: <b>ICB ${LOT.edif?LOT.edif.icbTxt:'—'}</b> · ICA ${LOT.edif?LOT.edif.icaTxt:'—'}<br>`+
+    `${LOT.edif&&LOT.edif.mode==='floors'?('Altura máx: <b style="color:#37d39b">'+LOT.edif.maxPisos+' pisos</b> · '):LOT.edif&&LOT.edif.mode==='index'?('Índice máx: <b style="color:#37d39b">'+LOT.edif.icTotal.toFixed(2)+'</b> · '):''}frente lote ≈ ${LOT.front.len.toFixed(1)} m`;
   document.getElementById('hud-npn').textContent=p.npn?String(p.npn).slice(-6):'—';
   document.getElementById('hud-area').textContent=Math.round(area).toLocaleString('es-CO')+' m²';
   drawLot();applyUso();buildMass();toast('Predio cargado ✓');
