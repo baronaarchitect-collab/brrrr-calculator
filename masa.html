@@ -72,6 +72,8 @@
     <div class="ctl"><label>Altura de piso (m) <span class="v" id="v-fh">3.0</span></label><input type="range" id="s-fh" min="2.4" max="6" step="0.1" value="3"></div>
     <div class="ctl"><label>Retiro / aislamiento (m) <span class="v" id="v-off">3</span></label><input type="range" id="s-off" min="0" max="15" step="0.5" value="3"></div>
     <button class="btn viol" id="btn-mass">▣ Desarrollar masa normativa</button>
+    <button class="btn" id="btn-ml" style="background:linear-gradient(135deg,#a06bff,#6b3fd0);color:#fff;border:none;margin-top:6px">🧠 Generar masa con ML (PyTorch)</button>
+    <div class="note" id="mlNote"></div>
 
     <h2>4 · Resultados</h2>
     <div class="metrics">
@@ -351,10 +353,70 @@ document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')f
 document.getElementById('btn-mass').addEventListener('click',buildMass);
 document.getElementById('btn-export').addEventListener('click',()=>{
   if(!LOT||!LOT._mass)return toast('Genera una masa primero.');
-  const out={predio:LOT.props,area:LOT.area,icb:LOT.icb,ica:LOT.ica,masa:LOT._mass,ring_wgs84:LOT.ring};
+  const out={predio:LOT.props,area:LOT.area,edif:LOT.edif,masa:LOT._mass,ring_wgs84:LOT.ring};
   const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='masa_'+(LOT.props.npn||'predio')+'.json';a.click();
 });
+
+// ============ Modelo ML (masa normativa, PyTorch export) ============
+// Red MLP entrenada en ml/train_masa.py: geometría del lote + norma Cali (IO/IC)
+// -> parámetros de masa que maximizan aprovechamiento respetando la edificabilidad.
+let MLMODEL=null;
+fetch('ml/masa_model.json').then(r=>r.ok?r.json():null).then(j=>{MLMODEL=j;
+  if(!j)document.getElementById('mlNote').textContent='(modelo ML no encontrado)';
+}).catch(()=>{});
+function mlForward(feats){
+  let x=feats.map((v,i)=>v/MLMODEL.featScale[i]);
+  const L=MLMODEL.layers, act=MLMODEL.act;
+  for(let li=0;li<L.length;li++){
+    const W=L[li].W,b=L[li].b,out=new Array(W.length);
+    for(let o=0;o<W.length;o++){let s=b[o];const row=W[o];for(let k=0;k<row.length;k++)s+=row[k]*x[k];out[o]=s;}
+    if(act[li]==='relu')for(let o=0;o<out.length;o++)out[o]=Math.max(0,out[o]);
+    else if(act[li]==='sigmoid')for(let o=0;o<out.length;o++)out[o]=1/(1+Math.exp(-out[o]));
+    x=out;
+  }
+  return x; // [frontUse, depthUse, floorsNorm, setbackNorm]
+}
+function lotFeatures(){
+  const area=LOT.area, front=LOT.front.len, depth=Math.max(maxDepth(LOT.ring,LOT.front),1);
+  const aspect=front/depth;
+  let per=0;for(let i=0;i<LOT.ring.length;i++){const a=LOT.ring[i],b=LOT.ring[(i+1)%LOT.ring.length];per+=Math.hypot(b.x-a.x,b.z-a.z);}
+  const compac=Math.min(1,4*Math.PI*area/((per*per)||1));
+  const ix=indices(usoSel.value,area), ed=LOT.edif;
+  let icMax,maxFloors;
+  if(ed&&ed.mode==='index'){icMax=ed.icTotal;maxFloors=20;}
+  else if(ed&&ed.mode==='floors'){maxFloors=ed.maxPisos;icMax=ed.maxPisos*ix.io;}
+  else {icMax=ix.ic;maxFloors=20;}
+  return {vec:[area,front,depth,aspect,compac,ix.io,icMax,maxFloors],maxFloors,front};
+}
+function runML(){
+  if(!LOT)return toast('Primero busca un predio.');
+  if(!MLMODEL)return toast('Modelo ML aún no cargado.');
+  const F=lotFeatures(), y=mlForward(F.vec);
+  const fu=Math.min(1,Math.max(0.4,y[0]));
+  let floors=Math.round(y[2]*MLMODEL.floorCap);
+  floors=Math.max(1,Math.min(floors,Math.round(F.maxFloors),40));
+  const setback=Math.min(MLMODEL.setbackCap,Math.max(0,y[3]*MLMODEL.setbackCap));
+  const front_m=Math.min(80,Math.max(4,fu*F.front));
+  // Clamp de cumplimiento: la masa ML no puede exceder la edificabilidad POT (índice IC)
+  const ix=indices(usoSel.value,LOT.area), ed=LOT.edif;
+  const frontEff=Math.max(front_m-2*setback,2);
+  const availDepth=Math.max(maxDepth(LOT.ring,LOT.front)-setback,2);
+  const ocupEst=frontEff*Math.min((LOT.area*ix.io)/frontEff,availDepth);
+  const maxBuilt = ed&&ed.mode==='index' ? ed.icTotal*LOT.area
+                 : ed&&ed.mode==='floors' ? Infinity
+                 : ix.ic*LOT.area;
+  if(isFinite(maxBuilt)&&ocupEst>0) floors=Math.max(1,Math.min(floors,Math.floor(maxBuilt/ocupEst)));
+  const set=(s,v,val)=>{document.getElementById(s).value=val;document.getElementById(v).textContent=val;};
+  set('s-front','v-front',front_m.toFixed(1));
+  set('s-floors','v-floors',floors);
+  set('s-off','v-off',setback.toFixed(1));
+  buildMass();
+  if(LOT._mass)LOT._mass.ml={frontUse:+fu.toFixed(3),depthUse:+y[1].toFixed(3),floors,setback:+setback.toFixed(2),model:'MasaNet(PyTorch)'};
+  document.getElementById('mlNote').innerHTML=`🧠 <b>ML:</b> ${floors} pisos · frente ${front_m.toFixed(1)} m · retiro ${setback.toFixed(1)} m · uso fondo ${(y[1]*100).toFixed(0)}%`;
+  toast('Masa generada con ML ✓');
+}
+document.getElementById('btn-ml').addEventListener('click',runML);
 applyUso();
 </script>
 </body>
