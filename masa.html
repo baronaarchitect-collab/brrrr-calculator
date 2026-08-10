@@ -209,7 +209,7 @@ function drawLot(){
   gLot.clear();
   const pts=LOT.ring.map(p=>new THREE.Vector3(p.x,0.15,p.z));
   gLot.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([...pts,pts[0]]),new THREE.LineBasicMaterial({color:0x6fb3ff})));
-  const shape=new THREE.Shape(LOT.ring.map(p=>new THREE.Vector2(p.x,p.z)));
+  const shape=new THREE.Shape(LOT.ring.map(p=>new THREE.Vector2(p.x,-p.z))); // -z: compensa rotateX(-90) para no espejar
   const fill=new THREE.Mesh(new THREE.ShapeGeometry(shape),new THREE.MeshBasicMaterial({color:0x12324f,transparent:true,opacity:.5,side:THREE.DoubleSide}));
   fill.rotation.x=-Math.PI/2;fill.position.y=0.05;gLot.add(fill);
   // marca del frente
@@ -241,7 +241,7 @@ function buildMass(){
   const B={x:b0.x+F.dir.x*half,z:b0.z+F.dir.z*half};
   const C={x:B.x+F.inward.x*fondo,z:B.z+F.inward.z*fondo};
   const D={x:A.x+F.inward.x*fondo,z:A.z+F.inward.z*fondo};
-  const shape=new THREE.Shape([A,B,C,D].map(p=>new THREE.Vector2(p.x,p.z)));
+  const shape=new THREE.Shape([A,B,C,D].map(p=>new THREE.Vector2(p.x,-p.z))); // -z: compensa rotateX(-90) para alinear con el lote y las líneas de piso
   const h=floors*fh;
   const geo=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false});geo.rotateX(-Math.PI/2);
   const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xa06bff,transparent:true,opacity:.72,roughness:.5,metalness:.15}));
