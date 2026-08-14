@@ -68,7 +68,7 @@
 
     <h2>3 · Parámetros de la masa</h2>
     <div class="ctl"><label>Pisos <span class="v" id="v-floors">5</span></label><input type="range" id="s-floors" min="1" max="40" value="5"></div>
-    <div class="ctl"><label>Frente del edificio (m) <span class="v" id="v-front">12</span></label><input type="range" id="s-front" min="4" max="80" step="0.5" value="12"></div>
+    <div class="ctl" style="display:none"><label>Frente del edificio (m) <span class="v" id="v-front">12</span></label><input type="range" id="s-front" min="4" max="80" step="0.5" value="12"></div>
     <div class="ctl"><label>Altura de piso (m) <span class="v" id="v-fh">3.0</span></label><input type="range" id="s-fh" min="2.4" max="6" step="0.1" value="3"></div>
     <div class="ctl"><label>Retiro / aislamiento (m) <span class="v" id="v-off">3</span></label><input type="range" id="s-off" min="0" max="15" step="0.5" value="3"></div>
     <button class="btn viol" id="btn-mass">▣ Desarrollar masa normativa</button>
@@ -204,6 +204,31 @@ function computeFront(pts){ // arista más larga = frente a la calle (heurístic
   return{a,b,dir,mid,inward,len:best};
 }
 function maxDepth(pts,front){let d=0;for(const p of pts){const dd=(p.x-front.mid.x)*front.inward.x+(p.z-front.mid.z)*front.inward.z;if(dd>d)d=dd;}return d;}
+function polyAreaXZ(pts){let a=0;for(let i=0;i<pts.length;i++){const p=pts[i],q=pts[(i+1)%pts.length];a+=p.x*q.z-q.x*p.z;}return Math.abs(a)/2;}
+// Retranquea (inset) el polígono REAL del lote 'd' metros hacia adentro: desplaza cada arista por su
+// normal interior y corta las aristas contiguas. Así la huella conserva la forma y orientación del lote.
+function insetPolygon(pts,d){
+  const n=pts.length; if(n<3||d<=0) return pts.slice();
+  const cx=pts.reduce((s,p)=>s+p.x,0)/n, cz=pts.reduce((s,p)=>s+p.z,0)/n;
+  const lines=[];
+  for(let i=0;i<n;i++){
+    const a=pts[i], b=pts[(i+1)%n];
+    let ex=b.x-a.x, ez=b.z-a.z; const L=Math.hypot(ex,ez)||1; ex/=L; ez/=L;
+    let nx=-ez, nz=ex;                                   // normal a la arista
+    const mx=(a.x+b.x)/2, mz=(a.z+b.z)/2;
+    if((cx-mx)*nx+(cz-mz)*nz<0){nx=-nx;nz=-nz;}          // orientar hacia el interior
+    lines.push({px:a.x+nx*d, pz:a.z+nz*d, dx:ex, dz:ez});
+  }
+  const out=[];
+  for(let i=0;i<n;i++){
+    const l1=lines[(i-1+n)%n], l2=lines[i];
+    const denom=l1.dx*l2.dz-l1.dz*l2.dx;
+    if(Math.abs(denom)<1e-9){out.push({x:pts[i].x,z:pts[i].z});continue;}
+    const t=((l2.px-l1.px)*l2.dz-(l2.pz-l1.pz)*l2.dx)/denom;
+    out.push({x:l1.px+l1.dx*t, z:l1.pz+l1.dz*t});
+  }
+  return out;
+}
 
 function drawLot(){
   gLot.clear();
@@ -222,36 +247,27 @@ function buildMass(){
   gMass.clear();
   const uso=usoSel.value,ix=indices(uso,LOT.area);
   const floors=+document.getElementById('s-floors').value;
-  let front=+document.getElementById('s-front').value;
   const fh=+document.getElementById('s-fh').value;
   const off=+document.getElementById('s-off').value;
 
-  const ocupObjetivo=LOT.area*ix.io;          // área a ocupar en primer piso
-  // frente efectivo (con retiros laterales) y fondo
-  const frontEff=Math.max(front-2*off,2);
-  let fondo=ocupObjetivo/frontEff;
-  const dispDepth=Math.max(maxDepth(LOT.ring,LOT.front)-off,2);
-  let clamped=false;
-  if(fondo>dispDepth){fondo=dispDepth;clamped=true;}
+  // HUELLA = contorno REAL del lote retranqueado por el retiro -> coincide con el límite del lote.
+  let foot=insetPolygon(LOT.ring, off);
+  let footArea=polyAreaXZ(foot);
+  if(!isFinite(footArea) || footArea < LOT.area*0.03){ foot=LOT.ring.slice(); footArea=LOT.area; } // retiro excesivo -> sin inset
 
-  const F=LOT.front, half=frontEff/2;
-  // base desplazada hacia adentro por retiro frontal
-  const b0={x:F.mid.x+F.inward.x*off,z:F.mid.z+F.inward.z*off};
-  const A={x:b0.x-F.dir.x*half,z:b0.z-F.dir.z*half};
-  const B={x:b0.x+F.dir.x*half,z:b0.z+F.dir.z*half};
-  const C={x:B.x+F.inward.x*fondo,z:B.z+F.inward.z*fondo};
-  const D={x:A.x+F.inward.x*fondo,z:A.z+F.inward.z*fondo};
-  const shape=new THREE.Shape([A,B,C,D].map(p=>new THREE.Vector2(p.x,-p.z))); // -z: compensa rotateX(-90) para alinear con el lote y las líneas de piso
   const h=floors*fh;
+  const shape=new THREE.Shape(foot.map(p=>new THREE.Vector2(p.x,-p.z))); // -z: compensa rotateX(-90) para alinear con el lote
   const geo=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false});geo.rotateX(-Math.PI/2);
   const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0xa06bff,transparent:true,opacity:.72,roughness:.5,metalness:.15}));
   gMass.add(mesh);
   gMass.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0xc9b3ff})));
-  // líneas de piso
-  for(let i=1;i<floors;i++){const y=i*fh;const r=[A,B,C,D,A].map(p=>new THREE.Vector3(p.x,y,p.z));gMass.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(r),new THREE.LineBasicMaterial({color:0xa06bff,transparent:true,opacity:.25})));}
+  // líneas de piso (siguen la huella del lote)
+  for(let i=1;i<floors;i++){const y=i*fh;const r=[...foot,foot[0]].map(p=>new THREE.Vector3(p.x,y,p.z));gMass.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(r),new THREE.LineBasicMaterial({color:0xa06bff,transparent:true,opacity:.25})));}
 
-  const ocupReal=frontEff*fondo;
+  const ocupReal=footArea;
   const built=ocupReal*floors;
+  const frontLen=(LOT.front&&LOT.front.len)||Math.sqrt(LOT.area);
+  const fondo=ocupReal/Math.max(frontLen,1);   // profundidad media (referencia)
   // Máximo POT: modo pisos -> tope por altura; modo índice -> área × (ICB+ICA); si no hay POT -> IC de la norma.
   const ed=LOT.edif;
   const maxPisosPOT = ed && ed.mode==='floors' ? ed.maxPisos : null;
@@ -270,12 +286,14 @@ function buildMass(){
     if(floors>maxPisosPOT){note=`⚠ Excede la altura POT: máximo ${maxPisosPOT} pisos (tienes ${floors}). Reduce pisos.`;cls='note warn';}
     else{note=`✓ Dentro de la altura POT (máx ${maxPisosPOT} pisos) · quedan ${maxPisosPOT-floors} piso(s).`;cls='note ok';}
   } else {
-    if(built>maxPot){note=`⚠ Excede el máximo POT en ${Math.round(built-maxPot).toLocaleString('es-CO')} m² (índice ${(maxPot/LOT.area).toFixed(2)}). Reduce pisos o frente.`;cls='note warn';}
+    if(built>maxPot){note=`⚠ Excede el máximo POT en ${Math.round(built-maxPot).toLocaleString('es-CO')} m² (índice ${(maxPot/LOT.area).toFixed(2)}). Reduce pisos.`;cls='note warn';}
     else{note=`✓ Dentro del máximo POT · disponible ${Math.round(maxPot-built).toLocaleString('es-CO')} m² (índice ${(maxPot/LOT.area).toFixed(2)}). `;cls='note ok';}
   }
-  if(clamped)note+=' El fondo se limitó al lote: con ese frente no cabe todo el IO — aumenta el frente.';
+  const ocupPct=ocupReal/LOT.area;
+  if(ocupPct>ix.io+0.005){note+=` La ocupación (${(ocupPct*100).toFixed(0)}%) supera el IO ${(ix.io*100).toFixed(0)}% — aumenta el retiro.`;}
   const cn=document.getElementById('checkNote');cn.textContent=note;cn.className=cls;
-  LOT._mass={uso:ix.label,io:ix.io,ic:ix.ic,floors,frente:front,fondo,fh,off,ocup:ocupReal,built,h,edif:LOT.edif,maxPot};
+  LOT._mass={uso:ix.label,io:ix.io,ic:ix.ic,floors,fondo,fh,off,ocup:ocupReal,built,h,edif:LOT.edif,maxPot,
+             footprint:foot.map(p=>({x:+p.x.toFixed(2),z:+p.z.toFixed(2)}))};
 }
 
 function applyUso(){
